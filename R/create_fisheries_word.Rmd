@@ -3,6 +3,7 @@ title: "CCAMLR State of the Environment Reporting: Fisheries"
 output:
   word_document:
 date: "2026-02-26"
+output_dir: output
 ---
 
 ```{r setup, include=FALSE}
@@ -11,7 +12,7 @@ knitr::opts_chunk$set(
   message = FALSE,
   fig.width = 8,
   fig.height = 5,
-  fig.path = "figures/",
+  fig.path = here::here("output/figures/"),
   fig.align = "center",
   dev.args = list(pointsize = 10)
 )

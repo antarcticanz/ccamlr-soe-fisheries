@@ -1,0 +1,305 @@
+---
+title: "CCAMLR State of the Environment Reporting: Fisheries"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+date: "2026-02-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+
+library(dplyr)
+library(readr)
+library(highcharter)
+library(here)
+library(htmltools)
+```
+
+<!-- Load data -->
+```{r load_data, include=FALSE}
+ds <- read_csv(here("ccamlr_data", "processed_data", "ccamlr_processed_data.csv"))
+year_min <- min(ds$season_ccamlr, na.rm = TRUE)
+year_max <- max(ds$season_ccamlr, na.rm = TRUE)
+```
+
+<!-- Build summary data -->
+```{r build_data, include=FALSE}
+taxa  <- c("TOA", "TOP", "ANI", "KRI")
+areas <- c("48", "58", "88")
+
+ds_catch_summary <- ds %>%
+  filter(
+    taxon_code %in% taxa,
+    area_code %in% areas
+  ) %>%
+  group_by(
+    season_ccamlr,
+    taxon_vernacular_name,
+    taxon_scientific_name,
+    taxon_code,
+    area_code
+  ) %>%
+  summarise(
+    catch_tonne = sum(greenweight_caught_tonne, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    season_ccamlr = as.integer(season_ccamlr),
+    catch_tonne = round(catch_tonne, 0)
+  )
+
+ds_sub_area_catch_summary <- ds %>%
+  filter(
+    taxon_code %in% taxa,
+    !asd_type %in% "Area"
+  ) %>%
+  group_by(
+    season_ccamlr,
+    taxon_vernacular_name,
+    taxon_scientific_name,
+    taxon_code,
+    asd_subarea_code
+  ) %>%
+  summarise(
+    catch_tonne = sum(greenweight_caught_tonne, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    season_ccamlr = as.integer(season_ccamlr),
+    catch_tonne = round(catch_tonne, 0)
+  ) %>%
+  ungroup()
+
+effort <- ds %>%
+  filter(
+    effort_or_catch == "effort",
+    area_code %in% areas
+  ) %>%
+  mutate(
+    target_species_code = trimws(target_species_code)
+  ) %>%
+  filter(
+    !is.na(target_species_code),
+    target_species_code != "",
+    target_species_code %in% taxa
+  ) %>%
+  group_by(season_ccamlr, target_species_code, area_code) %>%
+  summarise(
+    vessel_count = sum(vessel_count, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(season_ccamlr = as.integer(season_ccamlr))
+```
+
+<!-- Plotting functions -->
+```{r charts_area, echo=FALSE}
+
+
+make_taxon_widget_generic <- function(ds_one, group_col, legend_title, show_legend = TRUE) {
+
+  ver <- ds_one$taxon_vernacular_name[1]
+  sci <- ds_one$taxon_scientific_name[1]
+  title_txt <- paste(ver, sci, sep = " — ")
+
+
+  hc <- hchart(
+    ds_one,
+    type = "column",
+    hcaes(x = season_ccamlr, y = catch_tonne, group = .data[[group_col]])
+  ) %>%
+    hc_chart(zoomType = "x", panning = TRUE, panKey = "shift") %>%
+    hc_plotOptions(column = list(stacking = "normal")) %>%
+    hc_xAxis(
+      title = list(text = "Season CCAMLR"),
+      min = year_min,
+      max = year_max,
+      tickInterval = 5
+    ) %>%
+    hc_yAxis(title = list(text = "Catch (tonnes)")) %>%
+    hc_title(text = title_txt) %>%
+    hc_tooltip(shared = TRUE)
+
+  if (show_legend) {
+    hc <- hc %>% hc_legend(
+      enabled = TRUE,
+      title = list(text = legend_title),
+      align = "center",
+      verticalAlign = "bottom",
+      layout = "horizontal"
+    )
+  } else {
+    hc <- hc %>% hc_legend(enabled = FALSE)
+  }
+
+  hc
+}
+
+make_taxon_widget_area <- function(ds_one) {
+  make_taxon_widget_generic(
+    ds_one,
+    group_col = "area_code",
+    legend_title = "Management Area",
+    show_legend = TRUE
+  )
+}
+
+make_taxon_widget_area_effort <- function(ds_catch_area, ds_effort_area, area_code_one) {
+
+  ds_plot <- ds_catch_area %>%
+    left_join(
+      ds_effort_area,
+      by = c(
+        "season_ccamlr" = "season_ccamlr",
+        "area_code"     = "area_code",
+        "taxon_code"    = "target_species_code"
+      )
+    ) %>%
+    mutate(season_ccamlr = as.integer(season_ccamlr)) %>%
+    filter(!is.na(season_ccamlr)) %>%
+    distinct(season_ccamlr, area_code, taxon_code, .keep_all = TRUE) %>%
+    arrange(season_ccamlr)
+
+  ver <- ds_plot$taxon_vernacular_name[1]
+  sci <- ds_plot$taxon_scientific_name[1]
+
+  vmax <- suppressWarnings(max(ds_plot$vessel_count, na.rm = TRUE))
+  if (!is.finite(vmax)) vmax <- 0
+  vessel_ymax <- if (vmax > 100) ceiling(vmax / 10) * 10 else 100
+
+  highchart() %>%
+    hc_chart(zoomType = "x", panning = TRUE, panKey = "shift") %>%
+    hc_add_series(
+      data = ds_plot,
+      type = "column",
+      hcaes(x = season_ccamlr, y = catch_tonne),
+      name = "Catch (t)",
+      yAxis = 0
+    ) %>%
+    hc_add_series(
+      data = ds_plot,
+      type = "line",
+      hcaes(x = season_ccamlr, y = vessel_count),
+      name = "Vessel count",
+      yAxis = 1,
+      marker = list(enabled = TRUE)
+    ) %>%
+    hc_plotOptions(
+      column = list(groupPadding = 0.05, pointPadding = 0, borderWidth = 0)
+    ) %>%
+    hc_yAxis_multiples(
+      list(title = list(text = "Catch (tonnes)")),
+      list(
+        min = 0,
+        max = vessel_ymax,
+        opposite = TRUE,
+        title = list(text = "Vessel count", rotation = 270)
+      )
+    ) %>%
+    hc_xAxis(
+      title = list(text = "Season CCAMLR"),
+      min = year_min,
+      max = year_max,
+      tickInterval = 5
+    ) %>%
+    hc_title(text = paste0(ver, " - ", sci, " — Area ", area_code_one)) %>%
+    hc_tooltip(shared = TRUE)
+}
+
+sections <- lapply(taxa, function(tx) {
+
+  ds_area <- ds_catch_summary %>%
+    filter(taxon_code == tx, catch_tonne > 0) %>%
+    arrange(season_ccamlr, area_code)
+
+  area_block <- NULL
+  if (nrow(ds_area) > 0) {
+    area_block <- tagList(make_taxon_widget_area(ds_area), tags$br())
+  }
+
+  ds_eff_tx <- effort %>%
+    filter(target_species_code == tx, area_code %in% areas) %>%
+    arrange(season_ccamlr, area_code)
+
+  area_effort_plots <- lapply(areas, function(ar) {
+
+  ds_catch_ar <- ds_catch_summary %>%
+    filter(taxon_code == tx, area_code == ar) %>%
+    filter(!is.na(season_ccamlr)) %>%
+    arrange(season_ccamlr)
+  
+  ds_eff_ar <- ds_eff_tx %>%
+    filter(area_code == ar) %>%
+    filter(!is.na(season_ccamlr)) %>%
+    arrange(season_ccamlr)
+  
+  # if there isn't any data, don't plot ---> skip plot
+  if (nrow(ds_catch_ar) == 0 && nrow(ds_eff_ar) == 0) return(NULL)
+  
+
+  if (nrow(ds_eff_ar) == 0) return(NULL)
+
+    make_taxon_widget_area_effort(ds_catch_ar, ds_eff_ar, area_code_one = ar)
+  })
+
+  area_effort_plots <- Filter(Negate(is.null), area_effort_plots)
+
+  area_effort_block <- NULL
+  if (length(area_effort_plots) > 0) {
+    area_effort_block <- tagList(area_effort_plots, tags$br())
+  }
+
+  ds_sub <- ds_sub_area_catch_summary %>%
+    filter(taxon_code == tx) %>%
+    arrange(season_ccamlr, asd_subarea_code)
+
+  sub_block <- NULL
+  if (nrow(ds_sub) > 0) {
+
+    subareas <- sort(unique(ds_sub$asd_subarea_code))
+
+    sub_plots <- lapply(subareas, function(sa) {
+    
+      ds_one <- ds_sub %>%
+        filter(asd_subarea_code == sa) %>%
+        mutate(.legend_one = paste0("Subarea ", sa)) %>%
+        filter(!is.na(season_ccamlr)) %>%      # <- ADD THIS
+        arrange(season_ccamlr)                # <- AND THIS
+    
+      if (nrow(ds_one) == 0) return(NULL)
+
+      if (all(is.na(ds_one$catch_tonne)) || sum(ds_one$catch_tonne, na.rm = TRUE) == 0) return(NULL)
+    
+      ver <- ds_one$taxon_vernacular_name[1]
+      sci <- ds_one$taxon_scientific_name[1]
+    
+      make_taxon_widget_generic(
+        ds_one,
+        group_col = ".legend_one",  # or NULL if you remove grouping
+        legend_title = "Subarea",
+        show_legend = FALSE
+      ) %>%
+        hc_title(text = paste(ver, "-", sci, "— Subarea", sa))
+    })
+
+    sub_plots <- Filter(Negate(is.null), sub_plots)
+
+    if (length(sub_plots) > 0) {
+      sub_block <- tagList(sub_plots, tags$br())
+    }
+  }
+
+  if (is.null(area_block) && is.null(area_effort_block) && is.null(sub_block)) return(NULL)
+
+  tagList(
+    area_block,
+    area_effort_block,
+    sub_block,
+    tags$hr()
+  )
+})
+
+browsable(tagList(sections))
+
+```

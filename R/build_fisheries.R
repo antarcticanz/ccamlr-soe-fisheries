@@ -10,6 +10,11 @@ if (!dir.exists("data")) {
 dir.create("data")
 }
 
+if (!dir.exists("docs")) {
+  dir.create("docs")
+}
+
+
 
 zip_url  <- "https://www.ccamlr.org/en/system/files/CCAMLR_statistical%20bulletin_V37.zip"
 zip_file <- file.path("data", "ccamlr_statistical_bulletin_V37.zip")
@@ -21,8 +26,6 @@ unzip(zip_file, exdir = "data")
 ################################################################################
     ############################## BUILD ############################## 
 ################################################################################
-
-
 
 
 ds <- read_csv(
@@ -43,9 +46,6 @@ ds <- read_csv(
   ))
 
 
-if (!dir.exists("output")) {
-dir.create("output")
-}
 
 write_csv(ds, "data/ccamlr_processed_data.csv")
 
@@ -55,12 +55,12 @@ write_csv(ds, "data/ccamlr_processed_data.csv")
 
 rmarkdown::render(
   here::here("R/create_fisheries_html.Rmd"),
-  output_file = here::here("output", "CCAMLR SoE Fisheries.html")
+  output_file = here::here("docs", "CCAMLR SoE Fisheries.html")
 )
 
 
 
 rmarkdown::render(
   here::here("R/create_fisheries_word.Rmd"),
-  output_file = here::here("output", "CCAMLR SoE Fisheries.docx")
+  output_file = here::here("docs", "CCAMLR SoE Fisheries.docx")
 )

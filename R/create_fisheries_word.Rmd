@@ -12,7 +12,7 @@ knitr::opts_chunk$set(
   message = FALSE,
   fig.width = 8,
   fig.height = 5,
-  fig.path = here::here("output/figures/"),
+  fig.path = here::here("docs/figures/"),
   fig.align = "center",
   dev.args = list(pointsize = 10)
 )

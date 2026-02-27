@@ -6,17 +6,17 @@ options(scipen=999)
 
 # https://www.ccamlr.org/en/fisheries/toothfish-fisheries
 
-if (!dir.exists("ccamlr_data")) {
-dir.create("ccamlr_data")
+if (!dir.exists("data")) {
+dir.create("data")
 }
 
 
 zip_url  <- "https://www.ccamlr.org/en/system/files/CCAMLR_statistical%20bulletin_V37.zip"
-zip_file <- file.path("ccamlr_data", "ccamlr_statistical_bulletin_V37.zip")
+zip_file <- file.path("data", "ccamlr_statistical_bulletin_V37.zip")
 
 download.file(zip_url, destfile = zip_file, mode = "wb")
 
-unzip(zip_file, exdir = "ccamlr_data")
+unzip(zip_file, exdir = "data")
 
 ################################################################################
     ############################## BUILD ############################## 
@@ -26,7 +26,7 @@ unzip(zip_file, exdir = "ccamlr_data")
 
 
 ds <- read_csv(
-        "data/ccamlr/ccamlr_statistical_bulletin_volume_37/catch_and_effort/combined.csv",
+        "data/CCAMLR_statistical bulletin_V37/Combined.csv",
         show_col_types = FALSE,
         col_types = cols(
           .default  = col_guess(),      # keep guessing for everything else
@@ -42,20 +42,16 @@ ds <- read_csv(
     TRUE ~ NA_character_
   ))
 
-if (!dir.exists("ccamlr_data/processed_data")) {
-  dir.create("ccamlr_data/processed_data", recursive = TRUE, showWarnings = FALSE)
-}
 
 if (!dir.exists("output")) {
 dir.create("output")
 }
 
-write_csv(ds, "ccamlr_data/processed_data/ccamlr_processed_data.csv")
+write_csv(ds, "data/ccamlr_processed_data.csv")
 
 
 
 # Build the output files
-
 
 rmarkdown::render(
   here::here("R/create_fisheries_html.Rmd"),

@@ -19,7 +19,7 @@ library(htmltools)
 
 <!-- Load data -->
 ```{r load_data, include=FALSE}
-ds <- read_csv(here("ccamlr_data", "processed_data", "ccamlr_processed_data.csv"))
+ds <- read_csv(here("data", "ccamlr_processed_data.csv"))
 year_min <- min(ds$season_ccamlr, na.rm = TRUE)
 year_max <- max(ds$season_ccamlr, na.rm = TRUE)
 ```
@@ -140,7 +140,7 @@ make_taxon_widget_area <- function(ds_one) {
   make_taxon_widget_generic(
     ds_one,
     group_col = "area_code",
-    legend_title = "Management Area",
+    legend_title = "Statistical Area",
     show_legend = TRUE
   )
 }
